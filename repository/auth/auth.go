@@ -2,6 +2,8 @@ package auth
 
 import (
 	"errors"
+	"fmt"
+	"time"
 
 	"portfolio-user-service/config"
 	"portfolio-user-service/repository/auth/models"
@@ -53,5 +55,25 @@ func (ar AuthRepository) UpdateUserDetails(detail *models.UserDetail) error {
 	if err := config.DB.Save(detail).Error; err != nil {
 		return err
 	}
+	return nil
+}
+
+// VerifyUserEmailAddress verifies the user's email address
+func (ar AuthRepository) VerifyUserEmailAddress(email string) error {
+	result := config.DB.Model(&models.User{}).
+		Where("email = ? AND email_verified = false", email).
+		Updates(map[string]interface{}{
+			"email_verified":    true,
+			"email_verified_at": time.Now(),
+		})
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("no unverified user found with email: %s", email)
+	}
+
 	return nil
 }

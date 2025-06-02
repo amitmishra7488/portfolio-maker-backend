@@ -17,6 +17,8 @@ func AuthRoutes(router *gin.Engine) {
 
 	// 🔓 Public routes
 	authGroup.POST("/register", authController.RegisterUser)
+	authGroup.GET("/verify-email/", authController.VerifyEmail)
+	authGroup.GET("/verify-otp/", authController.VerifyRegistrationOTP)
 	authGroup.POST("/login", authController.LoginUser)
 
 	// 🔐 Protected routes

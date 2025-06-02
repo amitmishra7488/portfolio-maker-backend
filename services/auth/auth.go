@@ -3,6 +3,7 @@ package auth
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"portfolio-user-service/config"
 	"portfolio-user-service/repository/auth"
 	"portfolio-user-service/repository/auth/models"
@@ -53,7 +54,7 @@ func (s AuthService) Register(registerRequest models.RegisterRequest) error {
 
 		// Create empty profile
 		profile := &models.UserDetail{
-			UserID: user.ID,
+			UserID:   user.ID,
 			Username: nil,
 		}
 		if err := authRepo.CreateUserProfileTx(tx, profile); err != nil {
@@ -63,7 +64,6 @@ func (s AuthService) Register(registerRequest models.RegisterRequest) error {
 		return nil
 	})
 }
-
 
 func (s AuthService) Login(email, password string) (string, error) {
 	// Check if user exists
@@ -121,4 +121,58 @@ func (s AuthService) UpdateUserDetails(userID uint, input models.UpdateUserDetai
 	return *detail, nil
 }
 
+func (s AuthService) VerifyEmail(email, name string) error {
+	// Generate OTP
+	otp, err := utils.GenerateOTP(6)
+	if err != nil {
+		return fmt.Errorf("failed to generate OTP: %w", err)
+	}
 
+	subject := "Account Registration"
+	message := fmt.Sprintf("Your OTP for account verification is: %s", otp)
+	err = utils.SendEmail(email,name, message, subject)
+	if err != nil {
+		return fmt.Errorf("failed to send OTP: %w", err)
+	}
+
+	// Save OTP to Redis
+	// err = utils.SaveOTP(email, otp)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to save OTP: %w", err)
+	// }
+
+	return nil
+}
+
+func (s AuthService) VerifyRegistrationOTP(name, email, otp string) error {
+	// Check if OTP is valid
+	isValid, err := utils.CheckOTP(email, otp)
+	if err != nil {
+		return fmt.Errorf("failed to check OTP: %w", err)
+	}
+	if !isValid {
+		return errors.New("invalid OTP")
+	}
+
+	// Update user status to verified
+	err = authRepo.VerifyUserEmailAddress(email)
+	if err != nil {
+		return fmt.Errorf("failed to get user: %w", err)
+	}
+	
+
+	subject := "Account Registration SuccessFully"
+	message := fmt.Sprintf("Welcome %s! Your email has been successfully verified. You can now access all the features of your account.", name)
+	err = utils.SendEmail(email,name, message, subject)
+	if err != nil {
+		return fmt.Errorf("failed to send OTP: %w", err)
+	}
+
+	// Delete OTP from Redis
+	// err = utils.DeleteOTP(email)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to delete OTP: %w", err)
+	// }
+
+	return nil
+}
