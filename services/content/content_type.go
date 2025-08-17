@@ -5,17 +5,30 @@ import (
 	content "portfolio-user-service/repository/content"
 	"portfolio-user-service/repository/content/models"
 	"strings"
+
+	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
-type ContentTypeService struct{}
+// ContentTypeService struct with dependencies
+type ContentTypeService struct {
+	Repo *content.ContentTypeRepository
+	Log  *zap.Logger
+	DB   *gorm.DB
+}
 
-var (
-	contentTypeRepo = new(content.ContentTypeRepository)
-)
+// Constructor
+func NewContentTypeService(repo *content.ContentTypeRepository, db *gorm.DB, logger *zap.Logger) *ContentTypeService {
+	return &ContentTypeService{
+		Repo: repo,
+		Log:  logger,
+		DB:   db,
+	}
+}
 
-func (s ContentTypeService) Create(userID uint, input models.ContentTypeInput) (*models.ContentType, error) {
+func (s *ContentTypeService) Create(userID uint, input models.ContentTypeInput) (*models.ContentType, error) {
 	// Enforce max 3 content types per user
-	count, err := contentTypeRepo.CountByUser(userID)
+	count, err := s.Repo.CountByUser(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -24,7 +37,7 @@ func (s ContentTypeService) Create(userID uint, input models.ContentTypeInput) (
 	}
 
 	// Check for duplicate name
-	exists, err := contentTypeRepo.ExistsByName(userID, *input.Name)
+	exists, err := s.Repo.ExistsByName(userID, *input.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -42,16 +55,16 @@ func (s ContentTypeService) Create(userID uint, input models.ContentTypeInput) (
 		newType.Description = input.Description
 	}
 
-	if err := contentTypeRepo.Create(newType); err != nil {
+	if err := s.Repo.Create(newType); err != nil {
 		return nil, err
 	}
 
 	return newType, nil
 }
 
-func (s ContentTypeService) GetAllContentTypes(userID uint) ([]models.ContentTypeWithItemsResponse, error) {
+func (s *ContentTypeService) GetAllContentTypes(userID uint) ([]models.ContentTypeWithItemsResponse, error) {
 	var res []models.ContentTypeWithItemsResponse
-	res, err := contentTypeRepo.GetAllContentTypes(userID)
+	res, err := s.Repo.GetAllContentTypes(userID)
 	if err != nil {
 		return res, err
 	}

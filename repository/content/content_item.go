@@ -1,12 +1,21 @@
 package content
 
 import (
-	"portfolio-user-service/config"
 	"portfolio-user-service/repository/content/models"
+
+	"gorm.io/gorm"
 )
 
-type ContentItemRepository struct{}
+type ContentItemRepository struct {
+	DB *gorm.DB
+}
+
+func NewContentItemRepository(db *gorm.DB) *ContentItemRepository {
+	return &ContentItemRepository{
+		DB: db,
+	}
+}
 
 func (r *ContentItemRepository) Create(item *models.ContentItem) error {
-	return config.DB.Create(item).Error
+	return r.DB.Create(item).Error
 }

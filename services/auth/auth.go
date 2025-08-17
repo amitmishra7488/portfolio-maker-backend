@@ -4,26 +4,33 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"portfolio-user-service/config"
 	"portfolio-user-service/repository/auth"
 	"portfolio-user-service/repository/auth/models"
 	"portfolio-user-service/utils"
 
+	"go.uber.org/zap"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
-// AuthService struct
-type AuthService struct{}
+type AuthService struct {
+	Repo auth.AuthRepo
+	Log  *zap.Logger
+	DB   *gorm.DB
+}
 
-var (
-	authRepo = new(auth.AuthRepository)
-)
+func NewAuthService(repo auth.AuthRepo, db *gorm.DB, logger *zap.Logger) *AuthService {
+	return &AuthService{
+		Repo: repo,
+		Log:  logger,
+		DB:   db,
+	}
+}
 
-func (s AuthService) Register(registerRequest models.RegisterRequest) error {
-	return config.DB.Transaction(func(tx *gorm.DB) error {
+func (s *AuthService) Register(registerRequest models.RegisterRequest) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		// Check if user already exists
-		_, err := authRepo.GetUserByEmailTx(tx, registerRequest.Email)
+		_, err := s.Repo.GetUserByEmailTx(tx, registerRequest.Email)
 		if err == nil {
 			return errors.New("email already registered")
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -48,7 +55,7 @@ func (s AuthService) Register(registerRequest models.RegisterRequest) error {
 			Email:    registerRequest.Email,
 			Password: hashedPassword,
 		}
-		if err := authRepo.CreateUserTx(tx, user); err != nil {
+		if err := s.Repo.CreateUserTx(tx, user); err != nil {
 			return errors.New("failed to create user")
 		}
 
@@ -57,7 +64,7 @@ func (s AuthService) Register(registerRequest models.RegisterRequest) error {
 			UserID:   user.ID,
 			Username: nil,
 		}
-		if err := authRepo.CreateUserProfileTx(tx, profile); err != nil {
+		if err := s.Repo.CreateUserProfileTx(tx, profile); err != nil {
 			return errors.New("failed to create user profile")
 		}
 
@@ -65,9 +72,9 @@ func (s AuthService) Register(registerRequest models.RegisterRequest) error {
 	})
 }
 
-func (s AuthService) Login(email, password string) (string, error) {
+func (s *AuthService) Login(email, password string) (string, error) {
 	// Check if user exists
-	user, err := authRepo.GetUserByEmail(email)
+	user, err := s.Repo.GetUserByEmail(email)
 	if err != nil {
 		return "", errors.New("invalid email or password")
 	}
@@ -85,9 +92,9 @@ func (s AuthService) Login(email, password string) (string, error) {
 	return token, nil
 }
 
-func (s AuthService) UpdateUserDetails(userID uint, input models.UpdateUserDetailInput) (models.UserDetail, error) {
+func (s *AuthService) UpdateUserDetails(userID uint, input models.UpdateUserDetailInput) (models.UserDetail, error) {
 	// 1. Get existing details from repository
-	detail, err := authRepo.GetUserDetailsByUserID(userID)
+	detail, err := s.Repo.GetUserDetailsByUserID(userID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return models.UserDetail{}, errors.New("user details not found")
@@ -114,14 +121,14 @@ func (s AuthService) UpdateUserDetails(userID uint, input models.UpdateUserDetai
 	}
 
 	// 3. Save via repository
-	if err := authRepo.UpdateUserDetails(detail); err != nil {
+	if err := s.Repo.UpdateUserDetails(detail); err != nil {
 		return models.UserDetail{}, errors.New("failed to update user details")
 	}
 
 	return *detail, nil
 }
 
-func (s AuthService) VerifyEmail(email, name string) error {
+func (s *AuthService) VerifyEmail(email, name string) error {
 	// Generate OTP
 	otp, err := utils.GenerateOTP(6)
 	if err != nil {
@@ -130,7 +137,7 @@ func (s AuthService) VerifyEmail(email, name string) error {
 
 	subject := "Account Registration"
 	message := fmt.Sprintf("Your OTP for account verification is: %s", otp)
-	err = utils.SendEmail(email,name, message, subject)
+	err = utils.SendEmail(email, name, message, subject)
 	if err != nil {
 		return fmt.Errorf("failed to send OTP: %w", err)
 	}
@@ -144,7 +151,7 @@ func (s AuthService) VerifyEmail(email, name string) error {
 	return nil
 }
 
-func (s AuthService) VerifyRegistrationOTP(name, email, otp string) error {
+func (s *AuthService) VerifyRegistrationOTP(name, email, otp string) error {
 	// Check if OTP is valid
 	isValid, err := utils.CheckOTP(email, otp)
 	if err != nil {
@@ -155,15 +162,14 @@ func (s AuthService) VerifyRegistrationOTP(name, email, otp string) error {
 	}
 
 	// Update user status to verified
-	err = authRepo.VerifyUserEmailAddress(email)
+	err = s.Repo.VerifyUserEmailAddress(email)
 	if err != nil {
 		return fmt.Errorf("failed to get user: %w", err)
 	}
-	
 
 	subject := "Account Registration SuccessFully"
 	message := fmt.Sprintf("Welcome %s! Your email has been successfully verified. You can now access all the features of your account.", name)
-	err = utils.SendEmail(email,name, message, subject)
+	err = utils.SendEmail(email, name, message, subject)
 	if err != nil {
 		return fmt.Errorf("failed to send OTP: %w", err)
 	}
@@ -175,4 +181,14 @@ func (s AuthService) VerifyRegistrationOTP(name, email, otp string) error {
 	// }
 
 	return nil
+}
+
+func (s *AuthService) GetAllUser() ([]models.User, error) {
+	var users []models.User
+	users, err := s.Repo.GetAllUser()
+	if err != nil {
+		return users, errors.New("something went wrong" + err.Error())
+	}
+
+	return users, nil
 }

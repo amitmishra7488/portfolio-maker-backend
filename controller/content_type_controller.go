@@ -6,15 +6,23 @@ import (
 	content "portfolio-user-service/services/content"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
-type ContentTypeController struct{}
+type ContentTypeController struct {
+	ContentTypeService *content.ContentTypeService
+	Log                *zap.Logger
+}
 
-var (
-	contentTypeService = new(content.ContentTypeService)
-)
+// Constructor
+func NewContentTypeController(contentTypeService *content.ContentTypeService, log *zap.Logger) *ContentTypeController {
+	return &ContentTypeController{
+		ContentTypeService: contentTypeService,
+		Log:                log,
+	}
+}
 
-func (cc ContentTypeController) CreateContentType(c *gin.Context) {
+func (cc *ContentTypeController) CreateContentType(c *gin.Context) {
 	userID := c.MustGet("userID").(uint)
 
 	var input models.ContentTypeInput
@@ -23,7 +31,7 @@ func (cc ContentTypeController) CreateContentType(c *gin.Context) {
 		return
 	}
 
-	newType, err := contentTypeService.Create(userID, input)
+	newType, err := cc.ContentTypeService.Create(userID, input)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -32,10 +40,10 @@ func (cc ContentTypeController) CreateContentType(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"content_type": newType})
 }
 
-func (cc ContentTypeController) GetAllContentTypes(c *gin.Context) {
+func (cc *ContentTypeController) GetAllContentTypes(c *gin.Context) {
 	userID := c.MustGet("userID").(uint)
 
-	data, err := contentTypeService.GetAllContentTypes(userID)
+	data, err := cc.ContentTypeService.GetAllContentTypes(userID)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": data})

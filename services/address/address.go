@@ -4,25 +4,34 @@ package address
 
 import (
 	"errors"
-	"portfolio-user-service/config"
 	"portfolio-user-service/repository/address"
 	"portfolio-user-service/repository/address/models"
 
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
-type AddressService struct{}
+type AddressService struct {
+	Repo *address.AddressRepository
+	Log  *zap.Logger
+	DB   *gorm.DB
+}
 
-var (
-	addressRepo = new(address.AddressRepository)
-)
+// Constructor
+func NewAddressService(repo *address.AddressRepository, db *gorm.DB, logger *zap.Logger) *AddressService {
+	return &AddressService{
+		Repo: repo,
+		Log:  logger,
+		DB:   db,
+	}
+}
 
-func (s AddressService) CreateAddress(userID uint, input models.AddressInput) (*models.Address, error) {
+func (s *AddressService) CreateAddress(userID uint, input models.AddressInput) (*models.Address, error) {
 	var newAddress *models.Address
 
-	err := config.DB.Transaction(func(tx *gorm.DB) error {
+	err := s.DB.Transaction(func(tx *gorm.DB) error {
 		// Check if user already has any addresses
-		hasAddress, err := addressRepo.UserHasAddressTx(tx, userID)
+		hasAddress, err := s.Repo.UserHasAddressTx(tx, userID)
 		if err != nil {
 			return err
 		}
@@ -46,7 +55,7 @@ func (s AddressService) CreateAddress(userID uint, input models.AddressInput) (*
 		}
 
 		// Save the address
-		if err := addressRepo.CreateAddressTx(tx, newAddress); err != nil {
+		if err := s.Repo.CreateAddressTx(tx, newAddress); err != nil {
 			return err
 		}
 
@@ -56,10 +65,9 @@ func (s AddressService) CreateAddress(userID uint, input models.AddressInput) (*
 	return newAddress, err
 }
 
-
-func (s AddressService) UpdateAddress(userID, addressID uint, input models.AddressInput) (*models.Address, error) {
+func (s *AddressService) UpdateAddress(userID, addressID uint, input models.AddressInput) (*models.Address, error) {
 	// Get the address and ensure it belongs to the user
-	address, err := addressRepo.GetAddressByIDAndUserID(config.DB, addressID, userID)
+	address, err := s.Repo.GetAddressByIDAndUserID(addressID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +106,7 @@ func (s AddressService) UpdateAddress(userID, addressID uint, input models.Addre
 	}
 
 	// Call repo with patch-style update
-	if err := addressRepo.UpdateAddressFields(config.DB, addressID, userID, updates); err != nil {
+	if err := s.Repo.UpdateAddressFields(addressID, userID, updates); err != nil {
 		return nil, err
 	}
 
@@ -127,14 +135,9 @@ func (s AddressService) UpdateAddress(userID, addressID uint, input models.Addre
 	return address, nil
 }
 
-
-
-
-
-func (s AddressService) GetAllAddresses(userID uint) ([]models.Address, error) {
-	return addressRepo.GetAddressesByUserID(config.DB, userID)
+func (s *AddressService) GetAllAddresses(userID uint) ([]models.Address, error) {
+	return s.Repo.GetAddressesByUserID(userID)
 }
-
 
 func safeString(s *string) string {
 	if s != nil {

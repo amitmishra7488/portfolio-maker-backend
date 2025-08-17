@@ -7,16 +7,24 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
-type AddressController struct{}
+type AddressController struct {
+	AddressService *service.AddressService
+	Log            *zap.Logger
+}
 
-var (
-	addressService = new(service.AddressService)
-)
+// Constructor
+func NewAddressController(addressService *service.AddressService, log *zap.Logger) *AddressController {
+	return &AddressController{
+		AddressService: addressService,
+		Log:            log,
+	}
+}
 
 // POST /api/user/address
-func (ac AddressController) CreateAddress(c *gin.Context) {
+func (ac *AddressController) CreateAddress(c *gin.Context) {
 	userIDRaw, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
@@ -30,7 +38,7 @@ func (ac AddressController) CreateAddress(c *gin.Context) {
 		return
 	}
 
-	address, err := addressService.CreateAddress(userID, input)
+	address, err := ac.AddressService.CreateAddress(userID, input)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -58,7 +66,7 @@ func (ac AddressController) UpdateExistingAddress(c *gin.Context) {
 	}
 
 	// Call service layer
-	address, err := addressService.UpdateAddress(userID, uint(addressID), input)
+	address, err := ac.AddressService.UpdateAddress(userID, uint(addressID), input)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -67,12 +75,10 @@ func (ac AddressController) UpdateExistingAddress(c *gin.Context) {
 	c.JSON(http.StatusOK, address)
 }
 
-
-
 func (ac AddressController) GetAllAddresses(c *gin.Context) {
 	userID := c.MustGet("userID").(uint)
 
-	addresses, err := service.AddressService{}.GetAllAddresses(userID)
+	addresses, err := ac.AddressService.GetAllAddresses(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -80,4 +86,3 @@ func (ac AddressController) GetAllAddresses(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"addresses": addresses})
 }
-

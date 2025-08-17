@@ -6,50 +6,53 @@ import (
 	"os"
 	"time"
 
-	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
 
-var DB *gorm.DB
-
-func ConnectDatabase() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
-
-	dbUser := os.Getenv("DB_USER")
-	dbPassword := os.Getenv("DB_PASSWORD")
-	dbName := os.Getenv("DB_NAME")
-	dbHost := os.Getenv("DB_HOST")
-	dbPort := os.Getenv("DB_PORT")
-
+func ConnectDatabase(cfg *Config) (*gorm.DB, error) {
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=require",
-		dbHost, dbUser, dbPassword, dbName, dbPort)
-
-	database, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		Logger: dbLogging(),
-	})
+		cfg.DBHost, cfg.DBUser, cfg.DBPassword, cfg.DBName, cfg.DBPort)
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: gormLogger()})
 	if err != nil {
-		log.Fatal("Failed to connect to database:", err)
+		return nil, err
 	}
 
-	DB = database
-	fmt.Println("Database connected!")
+	// tune connection pool
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, err
+	}
+	sqlDB.SetMaxOpenConns(50)
+	sqlDB.SetMaxIdleConns(25)
+	sqlDB.SetConnMaxLifetime(30 * time.Minute)
+	sqlDB.SetConnMaxIdleTime(5 * time.Minute)
+	stats := sqlDB.Stats()
+
+	fmt.Printf("Open: %d, Idle: %d, InUse: %d\n",
+		stats.OpenConnections,
+		stats.Idle,
+		stats.InUse)
+
+	return db, sqlDB.Ping()
 }
 
-func dbLogging() logger.Interface {
-	// Enable query logging
-	newLogger := logger.New(
-		log.New(os.Stdout, "\r\n", log.LstdFlags), // Output
+func CloseDatabase(db *gorm.DB) {
+	sqlDB, err := db.DB()
+	if err == nil {
+		_ = sqlDB.Close()
+	}
+}
+
+func gormLogger() logger.Interface {
+	return logger.New(
+		log.New(os.Stdout, "\r\n", log.LstdFlags),
 		logger.Config{
-			SlowThreshold:             time.Second, // Slow SQL threshold
-			LogLevel:                  logger.Info, // Log level
-			IgnoreRecordNotFoundError: true,        // Ignore ErrRecordNotFound
-			Colorful:                  true,        // Enable colors
+			SlowThreshold:             time.Second,
+			LogLevel:                  logger.Info,
+			IgnoreRecordNotFoundError: true,
+			Colorful:                  true,
 		},
 	)
-	return newLogger
 }

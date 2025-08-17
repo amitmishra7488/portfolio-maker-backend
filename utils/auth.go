@@ -24,9 +24,9 @@ func CreateFullName(firstName, lastName string) (string, error) {
 
 	// Handle different cases
 	if firstName == "" && lastName == "" {
-		return "", errors.New("Invalid Name")
+		return "", errors.New("invalid name")
 	} else if firstName == "" {
-		return "", errors.New("Invalid Name")
+		return "", errors.New("invalid name")
 	} else if lastName == "" {
 		return firstName, nil
 	}

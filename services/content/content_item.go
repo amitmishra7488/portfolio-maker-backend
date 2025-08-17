@@ -3,14 +3,26 @@ package content
 import (
 	"portfolio-user-service/repository/content"
 	"portfolio-user-service/repository/content/models"
+
+	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
-type ContentItemService struct{}
+type ContentItemService struct {
+	Repo *content.ContentItemRepository
+	Log  *zap.Logger
+	DB   *gorm.DB
+}
 
-var (
-	contentItemRepo = new(content.ContentItemRepository)
-)
+// Constructor
+func NewContentItemService(repo *content.ContentItemRepository, db *gorm.DB, logger *zap.Logger) *ContentItemService {
+	return &ContentItemService{
+		Repo: repo,
+		Log:  logger,
+		DB:   db,
+	}
+}
 
-func (s ContentItemService) CreateContentItem(item *models.ContentItem) error {
-	return contentItemRepo.Create(item)
+func (s *ContentItemService) CreateContentItem(item *models.ContentItem) error {
+	return s.Repo.Create(item)
 }

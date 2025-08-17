@@ -7,15 +7,22 @@ import (
 	"portfolio-user-service/services/content"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
-type ContentItemController struct{}
+type ContentItemController struct {
+	ContentItemService *content.ContentItemService
+	Log                *zap.Logger
+}
 
-var (
-	contentItemService = new(content.ContentItemService)
-)
+func NewContentItemController(contentSevice *content.ContentItemService, log *zap.Logger) *ContentItemController {
+	return &ContentItemController{
+		ContentItemService: contentSevice,
+		Log:                log,
+	}
+}
 
-func (ci ContentItemController) CreateContentItem(c *gin.Context) {
+func (ci *ContentItemController) CreateContentItem(c *gin.Context) {
 	fmt.Println("coming here")
 	var req models.ContentItemRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -29,7 +36,7 @@ func (ci ContentItemController) CreateContentItem(c *gin.Context) {
 		Body:          req.Body,
 	}
 
-	if err := contentItemService.CreateContentItem(&item); err != nil {
+	if err := ci.ContentItemService.CreateContentItem(&item); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

@@ -1,47 +1,40 @@
 package main
 
 import (
-	"fmt"
-	"log"
-	"os"
-
 	"portfolio-user-service/config"
+	"portfolio-user-service/middleware"
+	"portfolio-user-service/pkg/logger"
 	"portfolio-user-service/routes"
 
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
+	"go.uber.org/zap"
 )
 
 func main() {
-	// Load environment variables
-	err := godotenv.Load()
+	// 1) config + logger + db
+	cfg := config.LoadConfig()
+
+	logr, _ := logger.New(cfg.Env)
+	defer logr.Sync()
+
+	db, err := config.ConnectDatabase(cfg)
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		logr.Fatal("db connect failed", zap.Error(err))
+	}
+	defer config.CloseDatabase(db)
+
+	// 2) gin with production middlewares
+	r := gin.New()
+	r.Use(gin.Recovery())
+	r.Use(middleware.RequestID())
+	r.Use(middleware.Logging(logr))
+	r.Use(middleware.Timeout(cfg.RequestTimeout))
+	r.Use(middleware.CORS(cfg.AllowedOrigins))
+
+	routes.InitializeRoutes(r, db, logr)
+	logr.Info("🚀 Starting server", zap.String("port", cfg.Port))
+	if err := r.Run(":" + cfg.Port); err != nil {
+		logr.Fatal("❌ Server failed to start", zap.Error(err))
 	}
 
-	// Connect to database
-	config.ConnectDatabase()
-
-	// Initialize Gin router
-	router := gin.Default()
-
-	// Configure CORS
-	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:5173", "https://your-domain.com"}, // Add your frontend URL here
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
-		AllowCredentials: true,
-	}))
-
-	// Register all routes from routes.go
-	routes.InitializeRoutes(router)
-
-	router.GET("/", func(ctx *gin.Context) {
-		ctx.JSON(200, gin.H{"message": "server is running"})
-	})
-	// Start the server
-	port := os.Getenv("PORT")
-	fmt.Println("✅ Server is running on port " + port)
-	router.Run(":" + port)
 }

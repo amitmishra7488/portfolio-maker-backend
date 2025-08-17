@@ -1,26 +1,21 @@
 package routes
 
 import (
-	_ "portfolio-user-service/docs"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
-	swaggerFiles "github.com/swaggo/files" // Import swagger files
-	ginSwagger "github.com/swaggo/gin-swagger"
+	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 // InitializeRoutes registers all routes in the router
-func InitializeRoutes(router *gin.Engine) {
+func InitializeRoutes(router *gin.Engine, db *gorm.DB, logger *zap.Logger) {
+	// health + root
+	router.GET("/", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"message": "server is running"}) })
+	router.GET("/health", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"status": "ok"}) })
+
 	// Register all routes here
-	AuthRoutes(router)
-	AddressRoutes(router)
-	ContentRoutes(router)
-
-	// Register Swagger
-	setupSwagger(router)
-}
-
-// setupSwagger adds Swagger documentation support
-func setupSwagger(router *gin.Engine) {
-	// Swagger UI
-	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	AuthRoutes(router, db, logger)
+	AddressRoutes(router, db, logger)
+	ContentRoutes(router, db, logger)
 }
