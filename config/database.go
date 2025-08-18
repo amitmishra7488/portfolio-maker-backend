@@ -24,10 +24,10 @@ func ConnectDatabase(cfg *Config) (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	sqlDB.SetMaxOpenConns(50)
-	sqlDB.SetMaxIdleConns(25)
-	sqlDB.SetConnMaxLifetime(30 * time.Minute)
-	sqlDB.SetConnMaxIdleTime(5 * time.Minute)
+	sqlDB.SetMaxOpenConns(10) // db max limit is 20 don’t exceed DB limit
+	sqlDB.SetMaxIdleConns(5)
+	sqlDB.SetConnMaxLifetime(5 * time.Minute)
+	sqlDB.SetConnMaxIdleTime(1 * time.Minute)
 	stats := sqlDB.Stats()
 
 	fmt.Printf("Open: %d, Idle: %d, InUse: %d\n",
