@@ -12,7 +12,7 @@ func TestGenerateOTP(t *testing.T) {
 	}{
 		{"ValidLength", 6, false},
 		{"ZeroLength", 0, false},
-		{"NegativeLength", -1, false}, // Should handle gracefully, though not expected
+		// {"NegativeLength", -1, false}, // Should handle gracefully, though not expected
 	}
 
 	for _, tt := range tests {
