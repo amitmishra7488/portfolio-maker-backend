@@ -24,6 +24,9 @@ func main() {
 	defer config.CloseDatabase(db)
 
 	// 2) gin with production middlewares
+	if cfg.Env == "prod" {
+		gin.SetMode(gin.ReleaseMode)
+	}
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(middleware.RequestID())
